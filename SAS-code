@@ -1,0 +1,77 @@
+title 'Bunnies Data';
+
+data bunnies;
+	infile '/home/u63740426/STA441/bunnies.data.txt';
+	input ID$ Time Drug Stiff Force preload;
+	label ID = 'Identification Code'
+		Time = 'Time (3,6,9,12 days of healing)'
+		Drug = 'Drug (1=HEBP, 0=placebo)'
+		Stiff = 'Stiffness in newtons/mm'
+		Force = 'Force in newtons'
+		preload = 'Force in newtons';
+		
+proc freq;
+	title3 'How many rabbits in each drug treatment?';
+	tables Time*Drug;
+	
+proc GLM plots=none;
+	title3 'Two way ANOVA';
+	class Time Drug;
+	model Force = Time|Drug; /* model with interaction */
+	lsmeans Time*Drug; 
+	lsmeans Time Drug;
+	
+proc IML;
+	title3 'Proportion of remaining variation when removing:';
+	Fd = 11.04; Ft = 6.01; Fdt = 2.52; sd = 1; st = 3; sdt = 3; NminusP = 37 ;
+	F = 5.23; s = 7; 
+	time = st*Ft/(st*Ft + NminusP);
+	drug = sd*Fd/(sd*Fd + NminusP);
+	interaction = sdt*Fdt/(sdt*Fdt + NminusP);
+	overall = s*F/(s*F + NminusP);
+	print time drug interaction overall;
+	
+data bunny;
+	set bunnies;
+	if Drug = 1 and Time = 3 then mu11 = 1; else mu11= 0;
+	if Drug = 1 and Time = 6 then mu12 = 1; else mu12= 0;
+	if Drug = 1 and Time = 9 then mu13 = 1; else mu13= 0;
+	if Drug = 1 and Time = 12 then mu14 = 1; else mu14= 0;
+	if Drug = 0 and Time = 3 then mu21 = 1; else mu21= 0;
+	if Drug = 0 and Time = 6 then mu22 = 1; else mu22= 0;
+	if Drug = 0 and Time = 9 then mu23 = 1; else mu23= 0;
+	if Drug = 0 and Time = 12 then mu24 = 1; else mu24= 0;
+	label mu11 = 'day 3 drug'
+		mu12 = 'day 6 drug'
+		mu13 = 'day 9 drug'
+		mu14 = 'day 12 drug'
+		mu21 = 'day 3 placebo'
+		mu22 = 'day 6 placebo'
+		mu23 = 'day 9 placebo'
+		mu24 = 'day 12 placebo';
+	if mu11 = 1 then combo = 11; else if mu12 = 1 then combo = 12;
+	if mu13 = 1 then combo = 13; else if mu14 = 1 then combo = 14;
+	if mu21 = 1 then combo = 21; else if mu22 = 1 then combo = 22;
+	if mu23 = 1 then combo = 23; else if mu24 = 1 then combo = 24;
+	
+proc reg plots=none;
+	title3 'testing effectiveness of drug on different days';
+	model Force = mu11--mu24 / noint;
+	Overall: test mu11 = mu12=mu13=mu14=mu21=mu22=mu23=mu24;
+	day3: test mu11 = mu21;
+	day6: test mu12 = mu22;
+	day9: test mu13 = mu23;
+	day12: test mu14 = mu24;
+	
+proc multtest permutation;
+	title3 'Non parametric test for force';
+	class combo;
+	test mean(force);
+	contrast 'Drug day 3' 1 0 0 0 -1 0 0 0;
+	contrast 'Drug day 6' 0 1 0 0 0 -1 0 0;
+	contrast 'Drug day 9' 0 0 1 0 0 0 -1 0;
+	contrast 'Drug day 12' 0 0 0 1 0 0 0 -1;
+	
+	
+
+run;
